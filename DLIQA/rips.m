@@ -135,16 +135,14 @@ fprintf('Starting Rips-Complex Calculations...... \n')
                                       
                     dis = sqrt((B(3,ii) - B(3,jj))^2 + (B(4,ii) - B(4,jj))^2 + (B(5,ii) - B(5,jj))^2);
                     
-                    if dis < 0.002 %????? error??
-                        dis
-                    end
-                    qi=B(6,ii);
-                    qj=B(6,jj);
+                    qi=B(6,i);
+                    qj=B(6,j);
                     %dist(i,j) = dis;
                     dist(i,j) = 1.0/(1.0+exp(-100.0*qi*qj/dis));
                 end
             end
             distances=[dist0 dist;dist',dist1];
+            
 
             m_space = metric.impl.ExplicitMetricSpace(distances);
             stream = api.Plex4.createVietorisRipsStream(m_space, 1, 2.0, 1000);
