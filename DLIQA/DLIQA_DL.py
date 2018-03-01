@@ -4,7 +4,7 @@ import os
 import pandas as pd
 
 
-def dl_train():
+def dl_train(train_2D,train_1D,train_1D_C,target):
     
     from keras.models import Sequential
     from keras.layers.convolutional import Conv2D
@@ -119,7 +119,7 @@ def dl_train():
 
     tot_model.add(Dropout(0.5)) 
     
-    tot_model.add(Dense(1, activation='softmax'))
+    tot_model.add(Dense(1, activation='relu'))
 
     model2D.summary()
     model1D_rips.summary()
@@ -131,11 +131,6 @@ def dl_train():
     def mean_pred(y_true, y_pred):
         return K.mean(y_pred)
     
-    train_2D=np.random.rand(12,8,120,128)
-    train_1D_rips=np.random.rand(12,200,36)
-    train_1D_ripscharge=np.random.rand(12,100,50)
-    target=np.random.rand(12,1)
-    
 
     adam = Adam(lr=0.0001, decay=0.01)
     tot_model.compile(loss='mean_squared_error',
@@ -144,9 +139,9 @@ def dl_train():
     
     print('Start training')
     
-    #tot_model.fit([train_2D,train_1D_rips,train_1D_ripscharge],target,
-     #     epochs=150,
-      #    batch_size=16)
+    tot_model.fit([train_2D,train_1D,train_1D_C],target,
+          epochs=150,
+          batch_size=16)
     
     print('Training done')
 
@@ -158,34 +153,53 @@ def dl_train():
 
 def main():
     
-    dl_train()
-    exit()
+    firstcheck=0
+    list_1D_C=[]
+    list_1D=[]
+    list_2D=[]
+    list_name=[]
+
     valuefile= './CnM.featuresNPqDNZ'
     value_df=pd.read_csv(valuefile,delim_whitespace=1)
     data={}
-    cross_val=open('./cross_val_sets/cross_val_set_1')
-    
+    cross_val=open('./cross_val_sets/cross_val_set_test')
+
     lines = cross_val.read().splitlines()
-    for protein in lines:    
-        for file in os.listdir('./data/' + protein):
-            if file.endswith("_feature_rips_charge_1D.npz"):
-                    name=file[:-27]
-                    
-                    data_1D_charge = np.load(file)
-                    data_1D = np.load(name + '_feature_rips_1D.npy')
-                    data_2D = np.load(name + '_feature_alpha_2D.npy')
-                    
-                    for key,array in data_1D_charge.items():
-                        data.setdefault('train_1D_ripscharge', []).append(data_1D_charge[key])
-                    for key,array in data_1D.items():
-                        data.setdefault('train_1D_rips', []).append(data_1D[key])
-                    for key,array in data_2D.items():
-                        data.setdefault('train_2D', []).append(data_2D[key])
-                        
-                    data.setdefault('target', []).append(value_df.loc[((value_df['#'] == name),'CPscore')].values[0])
-                    
+    
+    amount_of_data=0
+    for p_dir in lines: 
+        name_split=p_dir.split('/')
 
-        
+        protein= name_split[1]
+ 
+        for file_p in os.listdir('./data/' + protein):
+      
+            if file_p.endswith('_feature_rips_charge_1D.npy'):
+                name=file_p[:-27]
+                amount_of_data=amount_of_data+1
+                list_name.append(name)
+                list_1D_C.append('./data/'+protein+'/'+file_p)
+                list_1D.append('./data/'+protein+'/'+name + '_feature_rips_1D.npy')
+                list_2D.append('./data/'+protein+'/'+name + '_feature_alpha_2D.npy')
 
+    print(amount_of_data)
+
+    data_1D_C = np.empty((amount_of_data,100,50))
+    data_1D = np.empty((amount_of_data,200,36))
+    data_2D = np.empty((amount_of_data,8,120,128))
+    target = np.empty((amount_of_data,1))
+
+    
+    
+    for count in range(amount_of_data):
+
+        data_1D_C[count,:,:]=np.load(list_1D_C[count])
+        data_1D[count,:,:]=np.load(list_1D[count])
+        data_2D[count,:,:]=np.load(list_2D[count])
+        target[count]=(value_df.loc[((value_df['#'] == list_name[count]),'CPscore')].values[0])
+
+    
+    dl_train(data_2D,data_1D,data_1D_C,target)
+ 
 if __name__ == '__main__':
     main()
