@@ -24,7 +24,7 @@ PROELE = {'C','N','O','S','H'};
 LIGELE = {'C','N','O','S','P','F','Cl','Br','I','H'};
 
 
-fprintf('Starting Rips-Complex Calculations...... \n')
+fprintf('Starting Rips-Complex Calculations...\n')
 
     Name=strcat(name,'.pts');
     %Name=strcat(name,'_charge.pts');
@@ -44,10 +44,13 @@ fprintf('Starting Rips-Complex Calculations...... \n')
             %[B(:,atoms0(1)) B(:,atoms1(1))]
             atoms1=find(B(1,:)==1 & B(2,:)==atomtypes(a1));
             clear distances
-            dist=ones(length(atoms0),length(atoms1))*100.0;
-            dist0=ones(length(atoms0),length(atoms0))*100.0;
-            dist1=ones(length(atoms1),length(atoms1))*100.0;
-
+            distances = ones(size(atoms0,2),size(atoms1,2)).*100.0;
+            %dist=ones(length(atoms0),length(atoms1))*100.0;
+            %dist0=ones(length(atoms0),length(atoms0))*100.0;
+            %dist1=ones(length(atoms1),length(atoms1))*100.0;
+            if length(atoms0)==0 || length(atoms1)==0;
+                continue
+            end
             %distances=ones(size(B,2),size(B,2))*100.0;
             %size(distances)
             for i=1:length(atoms0)
@@ -55,11 +58,14 @@ fprintf('Starting Rips-Complex Calculations...... \n')
                 for j=1:length(atoms1)
                     jj=atoms1(j);
                     dis = sqrt((B(3,ii) - B(3,jj))^2 + (B(4,ii) - B(4,jj))^2 + (B(5,ii) - B(5,jj))^2);
-                    dist(i,j) = dis;
+                    %dist(i,j) = dis;
+                    distances(i,j) = dis;
+                    distances(j,i) = dis;
+                    distances(i,i) = 0.0;
                 end
             end
-            distances=[dist0 dist;dist',dist1];
-
+            %distances=[dist0 dist;dist',dist1];
+            
             %continue
             m_space = metric.impl.ExplicitMetricSpace(distances);
             stream = api.Plex4.createVietorisRipsStream(m_space, 1, 12, 1000);
@@ -75,7 +81,7 @@ fprintf('Starting Rips-Complex Calculations...... \n')
             %       plot_barcodes(intervals, options);
             %       close
             %end
-            fileID = fopen(strcat(filepath,'/bar_files/',name,'_',PROELE{a0},'-',LIGELE{a1},'.bar'), 'w');
+            fileID = fopen(strcat(filepath,'/bar_files/',name,'_',PROELE{atomtypes(a0)},'-',LIGELE{atomtypes(a1)},'.bar'), 'w');
             endpoints = homology.barcodes.BarcodeUtility.getEndpoints(intervals, 0, false);
             if size(endpoints,1) > 0
 
@@ -105,7 +111,7 @@ fprintf('Starting Rips-Complex Calculations...... \n')
     clear dist1
     clear dist0
 
-
+fprintf('Charge Rips-Complex Calculations...\n')
     formatSpec = '%d %d %f %f %f %f';
     sizeA = [6,Inf];
 
@@ -120,32 +126,47 @@ fprintf('Starting Rips-Complex Calculations...... \n')
     for a0=1:length(atomtypes)
         atoms0=find(B(1,:)==0 & B(2,:)==atomtypes(a0));
         for a1=1:length(atomtypes)
-      
-            %[atomtypes(a0) atomtypes(a1)];
+            
+            %disp([atomtypes(a0) atomtypes(a1)])
+            %disp([PROELE{atomtypes(a0)} LIGELE{atomtypes(a1)}]);
             atoms1=find(B(1,:)==1 & B(2,:)==atomtypes(a1));
+            
             clear distances
-            dist=ones(length(atoms0),length(atoms1))*100.0;
-            dist0=ones(length(atoms0),length(atoms0))*100.0;
-            dist1=ones(length(atoms1),length(atoms1))*100.0;
-
+            distances = ones(size(atoms0,2),size(atoms1,2)).*100.0;
+            %disp(size(distances))
+            %dist=ones(length(atoms0),length(atoms1))*100.0;
+            %dist0=ones(length(atoms0),length(atoms0))*100.0;
+            %dist1=ones(length(atoms1),length(atoms1))*100.0;
+            
+            %disp([length(atoms0),length(atoms1)])
+            
+            if length(atoms0)==0 || length(atoms1)==0;
+                continue
+            end
+            
             for i=1:length(atoms0)
                 ii=atoms0(i);
                 for j=1:length(atoms1)
                     jj=atoms1(j);
-                                      
+                    
+                    
                     dis = sqrt((B(3,ii) - B(3,jj))^2 + (B(4,ii) - B(4,jj))^2 + (B(5,ii) - B(5,jj))^2);
                     
-                    qi=B(6,i);
-                    qj=B(6,j);
-                    %dist(i,j) = dis;
-                    dist(i,j) = 1.0/(1.0+exp(-100.0*qi*qj/dis));
+
+                    qi=B(6,ii);
+                    qj=B(6,jj);
+                    
+                    distances(i,j) = 1.0/(1.0+exp(-100.0*qi*qj/dis));
+                    distances(j,i) = 1.0/(1.0+exp(-100.0*qi*qj/dis));
+                    
+                    distances(i,i) = 0.0;
+                    %dist(i,j) = 1.0/(1.0+exp(-100.0*qi*qj/dis));
                 end
             end
-            distances=[dist0 dist;dist',dist1];
-            
+            %distances=[dist0 dist;dist',dist1];
 
             m_space = metric.impl.ExplicitMetricSpace(distances);
-            stream = api.Plex4.createVietorisRipsStream(m_space, 1, 2.0, 1000);
+            stream = api.Plex4.createVietorisRipsStream(m_space, 1, 2.0, 20000);
             %stream = api.Plex4.createVietorisRipsStream(m_space, 1, 12, 1000);
             persistence = api.Plex4.getModularSimplicialAlgorithm(1, 2);
             intervals = persistence.computeIntervals(stream);
@@ -160,7 +181,7 @@ fprintf('Starting Rips-Complex Calculations...... \n')
             %       close
             %end
             
-            fileID = fopen(strcat(filepath,'/bar_files/',name,'_',PROELE{a0},'-',LIGELE{a1},'_charge.bar'), 'w');
+            fileID = fopen(strcat(filepath,'/bar_files/',name,'_',PROELE{atomtypes(a0)},'-',LIGELE{atomtypes(a1)},'_charge.bar'), 'w');
             endpoints = homology.barcodes.BarcodeUtility.getEndpoints(intervals, 0, false);
             if size(endpoints,1) > 0
                 
@@ -180,27 +201,4 @@ fprintf('Starting Rips-Complex Calculations...... \n')
     end
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-fprintf('Done! \n')
-%exit
+exit

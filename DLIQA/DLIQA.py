@@ -7,6 +7,7 @@ import re
 import math
 import numpy as np
 import os
+import time
 
 import pandas
 import multiprocessing
@@ -22,8 +23,105 @@ warnings.simplefilter('ignore', BiopythonWarning)
 
 #------------------------------------------------------------------------------------
 
-def GenerateFeature_alpha_2D(name, file_folder):
-    print('Generating Feature...')
+def Feature_rips_1D(name, file_folder):
+    print('Generating Rips Interaction Feature...')
+    ProEleList = ['C','N','O','S']
+    LigEleList = ['C','N','O','S','P','F','Cl','Br','I']
+
+    Bins = []
+    for i in range(201):
+        Bins.append(float(i)*0.25)
+
+    def BinID(x, B):
+        for iii in range(0,len(B)-1):
+            if x >= B[iii] and x <= B[iii+1]:
+                y = iii
+        return y
+    cut = 12.0
+
+    Feature = np.zeros([len(ProEleList), len(LigEleList), len(Bins)-1], float)
+
+    for j in range(len(ProEleList)):
+        ep = ProEleList[j]
+        for k in range(len(LigEleList)):
+            el = LigEleList[k]
+
+            
+
+            if not os.path.exists(file_folder+'/bar_files/'+name+'_'+ep+'-'+el+'.bar'):
+                continue
+            InFile = open(file_folder+'/bar_files/'+name+'_'+ep+'-'+el+'.bar')
+            lines = InFile.read().splitlines()
+            for line in lines:
+                dim,b,d = line.split()
+                if float(d) >= cut:
+                    continue
+                did = BinID(float(d),Bins)
+                Feature[j,k,did] += 1.0
+
+    FeatureFlat = np.zeros([len(Bins)-1, len(ProEleList)*len(LigEleList)], float)
+    for i in range(len(ProEleList)):
+        for j in range(len(LigEleList)):
+            fid = i*len(LigEleList)+j
+            for k in range(len(Bins)-1):
+                FeatureFlat[k,fid] = Feature[i,j,k]
+
+    OutFile = open(file_folder+'/'+name+'_feature_rips_1D.npy', 'w')
+    np.save(OutFile, FeatureFlat)
+    OutFile.close()
+
+#------------------------------------------------------------------------------------
+
+def Feature_rips_charge_1D(name, file_folder):
+    print('Generating Rips Charge Feature...')
+    ProEleList = ['C','N','O','S','H']
+    LigEleList = ['C','N','O','S','P','F','Cl','Br','I','H']
+
+    Bins = []
+    for i in range(101):
+        Bins.append(float(i)*0.01)
+
+    def BinID(x, B):
+        for iii in range(0,len(B)-1):
+            if x >= B[iii] and x <= B[iii+1]:
+                y = iii
+        return y
+    cut = 1.0
+
+    Feature = np.zeros([len(ProEleList), len(LigEleList), len(Bins)-1], float)
+
+    for j in range(len(ProEleList)):
+        ep = ProEleList[j]
+        for k in range(len(LigEleList)):
+            el = LigEleList[k]
+            if not os.path.exists(file_folder+'/bar_files/'+name+'_'+ep+'-'+el+'_charge.bar'):
+                continue
+            InFile = open(file_folder+'/bar_files/'+name+'_'+ep+'-'+el+'_charge.bar')
+            lines = InFile.read().splitlines()
+            for line in lines:
+                dim,b,d = line.split()
+                if float(d) >= cut:
+                    continue
+                did = BinID(float(d),Bins)
+                Feature[j,k,did] += 1.0
+
+    FeatureFlat = np.zeros([len(Bins)-1, len(ProEleList)*len(LigEleList)], float)
+
+    for i in range(len(ProEleList)):
+        for j in range(len(LigEleList)):
+            fid = i*len(LigEleList)+j
+            for k in range(len(Bins)-1):
+                FeatureFlat[k,fid] = Feature[i,j,k]
+    
+    OutFile = open(file_folder+'/'+name+'_feature_rips_charge_1D.npy', 'w')
+    np.save(OutFile, FeatureFlat)
+    OutFile.close()
+
+
+#------------------------------------------------------------------------------------
+
+def Feature_alpha_2D(name, file_folder):
+    print('Generating Alpha Feature...')
     
     thr = 12.0
     rs = 0.1
@@ -77,8 +175,8 @@ def GenerateFeature_alpha_2D(name, file_folder):
                     f_pl_i_j[7,bid:did+1] += 1.0
         #f_df_i_j = f_pl_i_j[:,:] - f_p_i_j[:,:]
         X[0:8,:,j] = f_pl_i_j[:,:]; #X[8:16,:,j] = f_df_i_j[:,:]
-
-    OutFile = open(file_folder+'/'+name+'_feature_complex_alpha_2DCNN.npy', 'w')
+    
+    OutFile = open(file_folder+'/'+name+'_feature_alpha_2D.npy', 'w')
     np.save(OutFile, X)
     OutFile.close()
 
@@ -186,7 +284,7 @@ def calc_residue_dist(residue1, residue2, outfile, outfile_charge, atom1_used, a
                     except:
                     	'odd'
                 if a2_serial not in atom2_used:
-                    atom1_used.append(a2_serial)
+                    atom2_used.append(a2_serial)
                     try:
                         list_index_l=lig.index(atom2.get_name()[0])
                         ele=str(list_index_l+1)
@@ -229,111 +327,156 @@ def calc_dist_matrix(chain_one, chain_two,outfile, outfile_charge, alphaprot) :
 
 
 #------------------------------------------------------------------------------------
+def check_in_use(name, file_folder):
 
+    if os.path.exists('./data/in_work/'+name+'.work') or os.path.exists(file_folder+'/'+name+'_feature_rips_charge_1D.npy'):
+        existing='true'
+    else:
+        if not os.path.exists("./data/in_work"):
+            os.makedirs("./data/in_work")
+        file_t =open('./data/in_work/'+name+'.work', 'w')
+        file_t.close()
+        existing='false'
+    return(existing)
+
+
+#------------------------------------------------------------------------------------
 def main():
     
-    
+    import random
+    #Random time for it to wait so two processes don't start at the same time
+    sleep_time=random.uniform(1, 50)
+
+    time.sleep(sleep_time)
     
     #python DLIQA.py -input_file
-    filename_pdb = '../../../CnM-dataset/MOAL_Benchmark/D1A2K/D1A2K-a0a-merged.pdb'  #sys.argv[1:]  
+    #filename_pdb = '../../../CnM-dataset/MOAL_Benchmark/D1A2K/D1A2K-a0a-merged.pdb'  #sys.argv[1:]
 
-#if sys_args[0]:
-    #    pdb_dir=sys_args[0]
-    #    sys_args = sys.argv[1:]
+    for filename_pdb in sys.argv[1:]:
+        #filename_pdb = sys.argv[1]  
+
     #if sys_args[0]:
-    #    valuefile=sys_args[0] #################################
-    #    sys_args = sys.argv[1:]
-    #if sys_args[0]:
-    #    valuefile=sys_args[0]
-    #    sys_args = sys.argv[1:]
-    
-   
-    
-    #cwd = os.getcwd()
-    
-    name_split=filename_pdb.split('/')
-    file_folder='./data/'+name_split[-2]
-    name=name_split[-1][:-11]
-    
-
-    if not os.path.exists(file_folder):
-            os.makedirs(file_folder)
-            os.makedirs(file_folder + "/pts_dir")
-            os.makedirs(file_folder + "/pqr_files")
-            os.makedirs(file_folder + "/temp")
-    if not os.path.exists(file_folder + "/pts_dir"):
-           os.makedirs(file_folder + "/pts_dir")
-    if not os.path.exists(file_folder + "/pqr_files"):
-           os.makedirs(file_folder + "/pqr_files")
-    if not os.path.exists(file_folder + "/temp"):
-           os.makedirs(file_folder + "/temp")
-
-    #working_file=open(cwd + '/data/pts_dir/working_file.txt', 'a')
-    #working_file.write(name+'\n') #Writes what pdb have been worked on in working_file.txt
-    #working_file.close()
-           
-    print(name)
-    
-    #filename_pdb=os.path.join(pdb_list[counter][0],pdb_list[counter][1])
-    
-    PDBobj = PDBParser()
-    structure = PDBobj.get_structure(filename_pdb, filename_pdb)
-    model = structure[0]
+        #    pdb_dir=sys_args[0]
+        #    sys_args = sys.argv[1:]
+        #if sys_args[0]:
+        #    valuefile=sys_args[0] #################################
+        #    sys_args = sys.argv[1:]
+        #if sys_args[0]:
+        #    valuefile=sys_args[0]
+        #    sys_args = sys.argv[1:]
+        
        
-    try: 
+        
+        #cwd = os.getcwd()
+        
+        name_split=filename_pdb.split('/')
+        file_folder='./data/'+name_split[-2]
+        
+        name_split2=name_split[-1].split('-')
+        
+        #This is just for naming just my dataset fine, else remove.      
+        if len(name_split2)==3:
+            name=name_split[-1][:-11]
+        else:
+            name=name_split[-1]
+        print(name)     
+        
+        existing=check_in_use(name,file_folder)
+        if existing=='true':
+            continue
+
+        #Cecking if all necessary folders exist
+        if not os.path.exists(file_folder):
+                os.makedirs(file_folder)
+                os.makedirs(file_folder + "/pts_dir")
+                os.makedirs(file_folder + "/pqr_files")
+                os.makedirs(file_folder + "/temp")
+        if not os.path.exists(file_folder + "/pts_dir"):
+               os.makedirs(file_folder + "/pts_dir")
+        if not os.path.exists(file_folder + "/pqr_files"):
+               os.makedirs(file_folder + "/pqr_files")
+        if not os.path.exists(file_folder + "/temp"):
+               os.makedirs(file_folder + "/temp")
+        if not os.path.exists(file_folder + "/bar_files"):
+               os.makedirs(file_folder + "/bar_files")
+
+        #working_file=open(cwd + '/data/pts_dir/working_file.txt', 'a')
+        #working_file.write(name+'\n') #Writes what pdb have been worked on in working_file.txt
+        #working_file.close()
+
+        #filename_pdb=os.path.join(pdb_list[counter][0],pdb_list[counter][1])
+        
         PDBobj = PDBParser()
         structure = PDBobj.get_structure(filename_pdb, filename_pdb)
         model = structure[0]
-    
-    except IOError: 
-        print('IO Error', filename_pdb)      
-        while 'true':
-            input1=raw_input("Error parsing PDB file! Continue(y/n)...")
-            if input1.lower()=='y':
-                continue
-            elif input1.lower()=='n':
-                sys.exit()
-    
-    #Seperate the 2 chains for calculation in PQR
-    io = PDBIO()
-    structure_pqr=[]
-    for chain in model.get_chains():
-        io.set_structure(chain)
-        io.save(file_folder+'/temp/'+name + "_" + chain.get_id() + ".pdb")
-        #If PQR=1 it will try to run pdb2pqr
-        PQR=1
-        if PQR==1:
-            infile=file_folder +'/temp/'+name + "_" + chain.get_id() + ".pdb"
-            outfile=file_folder + '/pqr_files/'+name + "_" + chain.get_id() +'.pqr'
-            print outfile
-            line = '/software/apps/python/2.7.13/anaconda-5.0.0.1/bin/python /proj/wallner/apps/apbs-pdb2pqr/pdb2pqr/pdb2pqr.py --ff=amber '+ infile +' '+ outfile
+           
+        try: 
+            PDBobj = PDBParser()
+            structure = PDBobj.get_structure(filename_pdb, filename_pdb)
+            model = structure[0]
+        
+        except IOError: 
+            print('IO Error', filename_pdb)      
+            while 'true':
+                input1=raw_input("Error parsing PDB file! Continue(y/n)...")
+                if input1.lower()=='y':
+                    continue
+                elif input1.lower()=='n':
+                    sys.exit()
+        
+        #Seperate the 2 chains for calculation in PQR
+        io = PDBIO()
+        structure_pqr=[]
+        for chain in model.get_chains():
+            io.set_structure(chain)
+            io.save(file_folder+'/temp/'+name + "_" + chain.get_id() + ".pdb")
+            #If PQR=1 it will try to run pdb2pqr
+            PQR=1
+            if PQR==1:
+                infile=file_folder +'/temp/'+name + "_" + chain.get_id() + ".pdb"
+                outfile=file_folder + '/pqr_files/'+name + "_" + chain.get_id() +'.pqr'
+                line = '/software/apps/python/2.7.13/anaconda-5.0.0.1/bin/python /proj/wallner/apps/apbs-pdb2pqr/pdb2pqr/pdb2pqr.py --ff=amber '+ infile +' '+ outfile
+                os.system(line)
+                structure_pqr.append(PDBobj.get_structure(outfile, outfile))
+                os.remove(file_folder +'/temp/'+name + "_" + chain.get_id() + ".pdb")
+        
+
+        outfile=open(file_folder+ '/pts_dir/'+name + '.pts', 'w')
+        outfile_charge=open(file_folder + '/pts_dir/'+name + '_charge.pts', 'w')
+        alphaprot={}
+        model1=structure_pqr[0][0]
+        model2=structure_pqr[1][0]
+
+        for chain1 in model1:
+            for chain2 in model2:
+                alphaprot=calc_dist_matrix(chain1, chain2, outfile,outfile_charge,alphaprot) #Makes coord files for matlab and returns a dict for alpha complex                      
+        outfile.close()
+        outfile_charge.close()
+
+
+        alpha(name, file_folder, alphaprot)
+        Feature_alpha_2D(name, file_folder)
+
+        #rips ./data/D1A2K D1A2K-a0a
+        line = "matlab -nodisplay -nodesktop -nosplash -r 'rips "+file_folder +" "+ name +"'"
+        print('Starting Matlab...')
+
+        try:
             os.system(line)
-            structure_pqr.append(PDBobj.get_structure(outfile, outfile))
-            os.remove(file_folder +'/temp/'+name + "_" + chain.get_id() + ".pdb")
-    
+        except IOError:
+            print('Error in matlab')
+            log_file=open('./data/logfile.txt'+name, 'a')
+            log_file.write('------Error in matlab for '+name+'------\n'+IOError+'\n')
+            log_file.close()
+            continue
+            
+        Feature_rips_1D(name, file_folder)
+        Feature_rips_charge_1D(name, file_folder)
+        
 
-    outfile=open(file_folder+ '/pts_dir/'+name + '.pts', 'w')
-    outfile_charge=open(file_folder + '/pts_dir/'+name + '_charge.pts', 'w')
-    alphaprot={}
-    model1=structure_pqr[0][0]
-    model2=structure_pqr[1][0]
-
-    for chain1 in model1:
-        for chain2 in model2:
-            alphaprot=calc_dist_matrix(chain1, chain2, outfile,outfile_charge,alphaprot) #Makes coord files for matlab and returns a dict for alpha complex                      
-    outfile.close()
-    outfile_charge.close()
+        os.remove('./data/in_work/'+name+'.work')
 
 
-    alpha(name, file_folder, alphaprot)
-    GenerateFeature_alpha_2D(name, file_folder)
-    
-
-    line = 'matlab -nodisplay -nodesktop -nosplash -r bar.m'
-    #os.system(line)
-    
-
-#matlab -nodisplay -nodesktop -nosplash -r PH_complex_interaction.m hej test
 
 if __name__ == '__main__':
     main()

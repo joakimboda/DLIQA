@@ -22,8 +22,105 @@ warnings.simplefilter('ignore', BiopythonWarning)
 
 #------------------------------------------------------------------------------------
 
-def GenerateFeature_alpha_2D(name, file_folder):
-    print('Generating Feature...')
+def Feature_rips_1D(name, file_folder):
+    print('Generating Rips Interaction Feature...')
+    ProEleList = ['C','N','O','S']
+    LigEleList = ['C','N','O','S','P','F','Cl','Br','I']
+
+    Bins = []
+    for i in range(201):
+        Bins.append(float(i)*0.25)
+
+    def BinID(x, B):
+        for iii in range(0,len(B)-1):
+            if x >= B[iii] and x <= B[iii+1]:
+                y = iii
+        return y
+    cut = 12.0
+
+    Feature = np.zeros([len(ProEleList), len(LigEleList), len(Bins)-1], float)
+
+    for j in range(len(ProEleList)):
+        ep = ProEleList[j]
+        for k in range(len(LigEleList)):
+            el = LigEleList[k]
+
+            
+
+            if not os.path.exists(file_folder+'/bar_files/'+name+'_'+ep+'-'+el+'.bar'):
+                continue
+            InFile = open(file_folder+'/bar_files/'+name+'_'+ep+'-'+el+'.bar')
+            lines = InFile.read().splitlines()
+            for line in lines:
+                dim,b,d = line.split()
+                if float(d) >= cut:
+                    continue
+                did = BinID(float(d),Bins)
+                Feature[j,k,did] += 1.0
+
+    FeatureFlat = np.zeros([len(Bins)-1, len(ProEleList)*len(LigEleList)], float)
+    for i in range(len(ProEleList)):
+        for j in range(len(LigEleList)):
+            fid = i*len(LigEleList)+j
+            for k in range(len(Bins)-1):
+                FeatureFlat[k,fid] = Feature[i,j,k]
+
+    OutFile = open(file_folder+'/'+name+'_feature_rips_1D.npy', 'w')
+    np.save(OutFile, FeatureFlat)
+    OutFile.close()
+
+#------------------------------------------------------------------------------------
+
+def Feature_rips_charge_1D(name, file_folder):
+    print('Generating Rips Charge Feature...')
+    ProEleList = ['C','N','O','S','H']
+    LigEleList = ['C','N','O','S','P','F','Cl','Br','I','H']
+
+    Bins = []
+    for i in range(101):
+        Bins.append(float(i)*0.01)
+
+    def BinID(x, B):
+        for iii in range(0,len(B)-1):
+            if x >= B[iii] and x <= B[iii+1]:
+                y = iii
+        return y
+    cut = 1.0
+
+    Feature = np.zeros([len(ProEleList), len(LigEleList), len(Bins)-1], float)
+
+    for j in range(len(ProEleList)):
+        ep = ProEleList[j]
+        for k in range(len(LigEleList)):
+            el = LigEleList[k]
+            if not os.path.exists(file_folder+'/bar_files/'+name+'_'+ep+'-'+el+'_charge.bar'):
+                continue
+            InFile = open(file_folder+'/bar_files/'+name+'_'+ep+'-'+el+'_charge.bar')
+            lines = InFile.read().splitlines()
+            for line in lines:
+                dim,b,d = line.split()
+                if float(d) >= cut:
+                    continue
+                did = BinID(float(d),Bins)
+                Feature[j,k,did] += 1.0
+
+    FeatureFlat = np.zeros([len(Bins)-1, len(ProEleList)*len(LigEleList)], float)
+
+    for i in range(len(ProEleList)):
+        for j in range(len(LigEleList)):
+            fid = i*len(LigEleList)+j
+            for k in range(len(Bins)-1):
+                FeatureFlat[k,fid] = Feature[i,j,k]
+
+    OutFile = open(file_folder+'/'+name+'_feature_rips_charge_1D.npy', 'w')
+    np.save(OutFile, FeatureFlat)
+    OutFile.close()
+
+
+#------------------------------------------------------------------------------------
+
+def Feature_alpha_2D(name, file_folder):
+    print('Generating Alpha Feature...')
     
     thr = 12.0
     rs = 0.1
@@ -78,7 +175,7 @@ def GenerateFeature_alpha_2D(name, file_folder):
         #f_df_i_j = f_pl_i_j[:,:] - f_p_i_j[:,:]
         X[0:8,:,j] = f_pl_i_j[:,:]; #X[8:16,:,j] = f_df_i_j[:,:]
 
-    OutFile = open(file_folder+'/'+name+'_feature_complex_alpha_2DCNN.npy', 'w')
+    OutFile = open(file_folder+'/'+name+'_feature_alpha_2D.npy', 'w')
     np.save(OutFile, X)
     OutFile.close()
 
@@ -180,18 +277,18 @@ def calc_residue_dist(residue1, residue2, outfile, outfile_charge, atom1_used, a
                     try:
                         list_index_p=pro.index(str(atom1.get_name()[0]))
                         ele=str(list_index_p+1)
-                        outfile.write('1'+' '+ele+' '+x1+' '+y1+' '+z1+'\n')
-                        outfile_charge.write('1'+' '+ele+' '+x1+' '+y1+' '+z1+' '+str(atom1.get_occupancy())+'\n')
+                        outfile.write('0'+' '+ele+' '+x1+' '+y1+' '+z1+'\n')
+                        outfile_charge.write('0'+' '+ele+' '+x1+' '+y1+' '+z1+' '+str(atom1.get_occupancy())+'\n')
                         alphaprot.setdefault('PRO', []).append([atom1.get_name()[0],x1,y1,z1])
                     except:
                     	'odd'
                 if a2_serial not in atom2_used:
-                    atom1_used.append(a2_serial)
+                    atom2_used.append(a2_serial)
                     try:
                         list_index_l=lig.index(atom2.get_name()[0])
                         ele=str(list_index_l+1)
-                        outfile.write('0'+' '+ele+' '+x2+' '+y2+' '+z2+'\n')
-                        outfile_charge.write('0'+' '+ele+' '+x2+' '+y2+' '+z2+' '+str(atom2.get_occupancy())+'\n')
+                        outfile.write('1'+' '+ele+' '+x2+' '+y2+' '+z2+'\n')
+                        outfile_charge.write('1'+' '+ele+' '+x2+' '+y2+' '+z2+' '+str(atom2.get_occupancy())+'\n')
                         alphaprot.setdefault('LIG', []).append([atom2.get_name()[0],x2,y2,z2])
                     except:
                             'odd'
@@ -201,7 +298,7 @@ def calc_residue_dist(residue1, residue2, outfile, outfile_charge, atom1_used, a
                     try:
                         list_index_p=pro.index(atom1.get_name()[0])
                         ele=str(list_index_p+1)
-                        outfile_charge.write('1'+' '+ele+' '+x1+' '+y1+' '+z1+' '+str(atom1.get_occupancy())+'\n')
+                        outfile_charge.write('0'+' '+ele+' '+x1+' '+y1+' '+z1+' '+str(atom1.get_occupancy())+'\n')
                     except:
                          'odd'
                 if a2_serial not in atom2_used:
@@ -209,7 +306,7 @@ def calc_residue_dist(residue1, residue2, outfile, outfile_charge, atom1_used, a
                     try:
                         list_index_l=lig.index(atom2.get_name()[0])
                         ele=str(list_index_l+1)
-                        outfile_charge.write('0'+' '+ele+' '+x2+' '+y2+' '+z2+' '+str(atom2.get_occupancy())+'\n')
+                        outfile_charge.write('1'+' '+ele+' '+x2+' '+y2+' '+z2+' '+str(atom2.get_occupancy())+'\n')
                     except:
                             'odd'
                 
@@ -235,7 +332,11 @@ def main():
     
     
     #python DLIQA.py -input_file
-    filename_pdb = '../../../CnM-dataset/MOAL_Benchmark/D1A2K/D1A2K-a0a-merged.pdb'  #sys.argv[1:]  
+    #filename_pdb = '../../../CnM-dataset/MOAL_Benchmark/D1A2K/D1A2K-a0a-merged.pdb'  #sys.argv[1:]
+    work_length=len(sys.argv[1:])
+    for filename_pdb in sys.argv[1:]:
+    
+    #filename_pdb = sys.argv[1]  
 
 #if sys_args[0]:
     #    pdb_dir=sys_args[0]
@@ -267,6 +368,8 @@ def main():
            os.makedirs(file_folder + "/pqr_files")
     if not os.path.exists(file_folder + "/temp"):
            os.makedirs(file_folder + "/temp")
+    if not os.path.exists(file_folder + "/bar_files"):
+           os.makedirs(file_folder + "/bar_files")
 
     #working_file=open(cwd + '/data/pts_dir/working_file.txt', 'a')
     #working_file.write(name+'\n') #Writes what pdb have been worked on in working_file.txt
@@ -326,11 +429,18 @@ def main():
 
 
     alpha(name, file_folder, alphaprot)
-    GenerateFeature_alpha_2D(name, file_folder)
-    
+    Feature_alpha_2D(name, file_folder)
 
-    line = 'matlab -nodisplay -nodesktop -nosplash -r bar.m'
-    #os.system(line)
+    #rips ./data/D1A2K D1A2K-a0a
+    line = "matlab -nodisplay -nodesktop -nosplash -r 'rips "+file_folder +" "+ name +"'"
+    print('Starting Matlab...')
+    os.system(line)
+    
+    Feature_rips_1D(name, file_folder)
+    Feature_rips_charge_1D(name, file_folder)
+
+
+
     
 
 #matlab -nodisplay -nodesktop -nosplash -r PH_complex_interaction.m hej test
