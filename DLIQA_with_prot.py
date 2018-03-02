@@ -134,10 +134,10 @@ def Feature_alpha_2D(name, file_folder):
     InFile = open(file_folder+'/'+name+'_alpha.pkl')
     BarCollection = pickle.load(InFile)
     for j in range(len(OrderedName)):
-        plname = OrderedName[j]; pname, lname = plname.split('_');
-        #f_p_i_j = np.zeros([8,lth], float)
+        f_p_i_j = np.zeros([8,lth], float)#/////////////////////////////////// 
         f_pl_i_j = np.zeros([8,lth], float)
-        '''if 'pro_'+pname in BarCollection.keys():
+#/////////////////////////////////// 		
+        if 'pro_'+pname in BarCollection.keys():
             Bars = BarCollection['pro_'+pname]
             for Bar in Bars:
                 if Bar[1] >= thr: continue
@@ -154,7 +154,8 @@ def Feature_alpha_2D(name, file_folder):
                 elif Bar[0] == 2:
                     f_p_i_j[5,bid] += 1.0
                     f_p_i_j[6,did] += 1.0
-                    f_p_i_j[7,bid:did+1] += 1.0'''
+                    f_p_i_j[7,bid:did+1] += 1.0
+#/////////////////////////////////// 			
         if 'com_'+plname in BarCollection.keys():
             Bars = BarCollection['com_'+plname]
             for Bar in Bars:
@@ -173,10 +174,12 @@ def Feature_alpha_2D(name, file_folder):
                     f_pl_i_j[5,bid] += 1.0
                     f_pl_i_j[6,did] += 1.0
                     f_pl_i_j[7,bid:did+1] += 1.0
-        #f_df_i_j = f_pl_i_j[:,:] - f_p_i_j[:,:]
-        X[0:8,:,j] = f_pl_i_j[:,:]; #X[8:16,:,j] = f_df_i_j[:,:]
-    
-    OutFile = open(file_folder+'/'+name+'_feature_alpha_2D.npy', 'w')
+ 		#X[0:8,:,j] = f_pl_i_j[:,:];
+#/////////////////////////////////// 
+        f_df_i_j = f_pl_i_j[:,:] - f_p_i_j[:,:]
+        X[0:8,:,j] = f_pl_i_j[:,:]; X[8:16,:,j] = f_df_i_j[:,:]
+#/////////////////////////////////// 
+    OutFile = open(file_folder+'/'+name+'_feature_alpha_2D_with_prot.npy', 'w')
     np.save(OutFile, X)
     OutFile.close()
 
@@ -236,6 +239,34 @@ def alpha(filename, file_folder, alphaprot):
                             Bars.append([int(b), float(c), float(d)])
                 BarCollection[name] = Bars
                 os.system('rm '+file_folder+'/temp/'+filename+'pt.csv '+file_folder+'/temp/'+filename+'tmp.out')
+				
+#/////////////////////////////////// 
+    for ep in ProEleCollection:
+        propts = []
+        for a in range(len(PRO)):
+            if PRO[a][0].replace(" ","") in ep:
+                propts.append([ PRO[a][1][0], PRO[a][1][1], PRO[a][1][2] ])
+        if len(propts) > 3:
+            pname = ''
+            for eep in ep:
+                pname = pname + eep
+            name = 'pro_'+pname
+            pt = propts
+            Bars = []
+            tmpoutfile = open(working_dir+'/pt.csv', 'w')
+            tmpoutfile.write('x1,x2,x3\n')
+            for pp in pt:
+                tmpoutfile.write(str(pp[0])+','+str(pp[1])+','+str(pp[2])+'\n')
+            tmpoutfile.close()
+            os.system('Rscript PH_Alpha.R '+working_dir+'/pt.csv '+working_dir+'/tmp.out')
+            tmpinfile = open(working_dir+'/tmp.out')
+            lines = tmpinfile.read().splitlines()
+            for line in lines[1:]:
+                a,b,c,d = line.split()
+                if d!='Inf':
+                    if float(d)-float(c) >= small:
+                        Bars.append([int(b), float(c), float(d)])
+            BarCollection[name] = Bars				
 
     print('Saving Alpha file...')
     OutFile = open(file_folder+'/'+filename+'_alpha.pkl', 'w')
@@ -456,7 +487,7 @@ def main():
 
         alpha(name, file_folder, alphaprot)
         Feature_alpha_2D(name, file_folder)
-
+'''
         #rips ./data/D1A2K D1A2K-a0a
         line = "matlab -nodisplay -nodesktop -nosplash -r 'rips "+file_folder +" "+ name +"'"
         print('Starting Matlab...')
@@ -472,7 +503,7 @@ def main():
             
         Feature_rips_1D(name, file_folder)
         Feature_rips_charge_1D(name, file_folder)
-        
+'''        
 
         os.remove('./data/in_work/'+name+'.work')
 
